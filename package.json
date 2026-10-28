@@ -1,0 +1,10 @@
+{
+  "name": "porchlight-dialer",
+  "version": "1.0.0",
+  "description": "Demo seller follow-up dialer: agent-aware dialing, state calling hours, daily limits, do-not-call, same-thread texts, CRM write-back and a daily planned-vs-done report.",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/rules.test.js"
+  },
+  "license": "MIT"
+}

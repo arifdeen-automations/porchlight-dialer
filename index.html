@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Porchlight Dialer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a sales-floor console. Sticky clock bar on top, tabbed work areas below, two-column panels that stack on phones. */
+:root{
+  --bg:#F2F4F1; --surface:#FFFFFF; --sunk:#E8ECE7; --line:#D3DAD2; --ink:#17201C; --muted:#5B6862;
+  --accent:#1D6A56; --accent-ink:#FFFFFF; --accent-bg:#DCEDE6; --signal:#B8661A; --signal-bg:#F6E7D6;
+  --ok:#2B7A4C; --ok-bg:#E0F0E5; --warn:#94650F; --warn-bg:#F6ECD6; --bad:#AF3535; --bad-bg:#F5E0DF;
+  --bubble-out:#1D6A56; --bubble-out-ink:#FFFFFF; --bubble-in:#E8ECE7;
+  --display:"Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body:"IBM Plex Sans", "Segoe UI", Roboto, Arial, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F1412; --surface:#161D1A; --sunk:#0B100E; --line:#2A3430; --ink:#E5ECE8; --muted:#93A29A;
+  --accent:#5CBB9B; --accent-ink:#0B1310; --accent-bg:#17322A; --signal:#E8A15A; --signal-bg:#3A2915;
+  --ok:#6CC08B; --ok-bg:#16301F; --warn:#E2B45E; --warn-bg:#332816; --bad:#EC7D76; --bad-bg:#3A1D1C;
+  --bubble-out:#2C7F68; --bubble-out-ink:#F2FBF7; --bubble-in:#222C28; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0F1412; --surface:#161D1A; --sunk:#0B100E; --line:#2A3430; --ink:#E5ECE8; --muted:#93A29A;
+  --accent:#5CBB9B; --accent-ink:#0B1310; --accent-bg:#17322A; --signal:#E8A15A; --signal-bg:#3A2915;
+  --ok:#6CC08B; --ok-bg:#16301F; --warn:#E2B45E; --warn-bg:#332816; --bad:#EC7D76; --bad-bg:#3A1D1C;
+  --bubble-out:#2C7F68; --bubble-out-ink:#F2FBF7; --bubble-in:#222C28; color-scheme:dark;}
+
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--ink)}
+body{font-family:var(--body);font-size:14px;line-height:1.5}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num,.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+.wrap{max-width:1280px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* top bar */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:var(--surface);border-bottom:1px solid var(--line)}
+.bar .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-block:12px}
+.brand{display:flex;align-items:center;gap:10px;min-width:0;margin-right:auto}
+.lamp{width:30px;height:30px;border-radius:8px;background:var(--accent);display:grid;place-items:center;flex:none}
+.lamp svg{width:18px;height:18px}
+.brand h1{font-family:var(--display);font-weight:700;font-size:19px;letter-spacing:-.01em;margin:0;line-height:1.1}
+.brand p{margin:0;color:var(--muted);font-size:12px}
+.clock{display:flex;align-items:baseline;gap:8px}
+.clock .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.clock .t{font-family:var(--mono);font-size:22px;font-weight:500;font-variant-numeric:tabular-nums}
+.clock .z{font-size:12px;color:var(--muted)}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 12px;cursor:pointer;font-weight:500;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:hover{background:var(--sunk)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.small{padding:4px 9px;font-size:12px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+select.btn{padding-right:8px}
+
+/* tabs */
+.tabs{display:flex;gap:4px;overflow-x:auto;padding-block:10px 0;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{border:0;background:none;padding:8px 14px;border-radius:8px 8px 0 0;cursor:pointer;color:var(--muted);font-weight:500;white-space:nowrap;border-bottom:2px solid transparent}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tab .cnt{font-family:var(--mono);font-size:11px;background:var(--sunk);border-radius:99px;padding:1px 6px;margin-left:4px}
+
+main.wrap{padding-block:18px 48px}
+.view{display:grid;gap:16px}
+h2{font-family:var(--display);font-weight:700;font-size:16px;margin:0;letter-spacing:-.005em}
+h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0;font-weight:600}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+.panel-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.sub{color:var(--muted);font-size:12.5px;margin:2px 0 0}
+.grid-2{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px}
+.grid-lead{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:16px;align-items:start}
+@media (max-width:900px){.grid-2,.grid-lead{grid-template-columns:minmax(0,1fr)}}
+
+/* pills */
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;border-radius:99px;padding:2px 8px;white-space:nowrap;background:var(--sunk);color:var(--muted)}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}
+.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.pill.bad{background:var(--bad-bg);color:var(--bad)}
+.pill.acc{background:var(--accent-bg);color:var(--accent)}
+.pill.sig{background:var(--signal-bg);color:var(--signal)}
+.pill.ring::before{animation:blink .8s steps(2) infinite}
+@keyframes blink{50%{opacity:.2}}
+@media (prefers-reduced-motion:reduce){.pill.ring::before{animation:none}}
+
+/* agents */
+.agents{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:620px){.agents{grid-template-columns:minmax(0,1fr)}}
+.agent{border:1px solid var(--line);border-radius:var(--r);padding:12px;display:grid;gap:8px;min-width:0;background:var(--surface)}
+.agent.live{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.agent.dial{border-color:var(--signal);box-shadow:inset 3px 0 0 var(--signal)}
+.agent-top{display:flex;align-items:center;gap:10px}
+.av{width:32px;height:32px;border-radius:50%;background:var(--sunk);display:grid;place-items:center;font-weight:600;font-size:12px;flex:none}
+.agent .nm{font-weight:600}
+.agent .on{font-size:12.5px;color:var(--muted);min-height:19px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.agent-foot{display:flex;justify-content:space-between;align-items:center;gap:8px}
+
+/* rows */
+.rows{display:grid;gap:0}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:10px 0;border-top:1px solid var(--line);align-items:center}
+.row:first-child{border-top:0}
+.row .who{font-weight:600}
+.row .meta{color:var(--muted);font-size:12.5px}
+.row .side{text-align:right;display:grid;justify-items:end;gap:3px}
+.linkish{background:none;border:0;padding:0;cursor:pointer;font-weight:600;text-align:left;color:var(--ink)}
+.linkish:hover{color:var(--accent);text-decoration:underline}
+.empty{color:var(--muted);font-size:13px;padding:12px 0}
+
+/* log */
+.log{max-height:430px;overflow:auto;display:grid;gap:0;margin:0 -4px;padding:0 4px}
+.ev{display:grid;grid-template-columns:62px 18px minmax(0,1fr);gap:8px;padding:7px 0;border-top:1px solid var(--line);font-size:13px}
+.ev:first-child{border-top:0}
+.ev .tm{font-family:var(--mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;padding-top:1px}
+.ev .ic{width:10px;height:10px;border-radius:3px;margin-top:5px;background:var(--muted)}
+.ev.dial .ic{background:var(--signal)} .ev.connect .ic{background:var(--accent)} .ev.text .ic{background:var(--ok)}
+.ev.block .ic{background:var(--bad)} .ev.crm .ic{background:var(--warn)} .ev.enroll .ic{background:var(--accent);border-radius:50%}
+.ev b{font-weight:600}
+
+/* lead list */
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:4px 11px;font-size:12.5px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.lead{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;padding:11px 12px;border-radius:8px;cursor:pointer;border:1px solid transparent;text-align:left;background:none;width:100%}
+.lead:hover{background:var(--sunk)}
+.lead[aria-current="true"]{background:var(--accent-bg);border-color:var(--accent)}
+.lead .nm{font-weight:600}
+.lead .meta{color:var(--muted);font-size:12.5px}
+.lead .r{grid-row:span 2;align-self:center;display:grid;justify-items:end;gap:4px}
+
+/* detail */
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:12px 0 4px}
+.kv div{background:var(--sunk);border-radius:8px;padding:8px 10px;min-width:0}
+.kv span{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.kv strong{font-weight:600;font-size:13.5px;overflow-wrap:anywhere}
+.checks{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.section{margin-top:18px;display:grid;gap:8px}
+.timeline{display:grid;gap:0;border-left:2px solid var(--line);margin-left:6px}
+.step{position:relative;padding:6px 0 8px 16px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;align-items:center}
+.step::before{content:"";position:absolute;left:-6px;top:12px;width:10px;height:10px;border-radius:50%;background:var(--surface);border:2px solid var(--line)}
+.step.done::before{background:var(--ok);border-color:var(--ok)}
+.step.blocked::before{background:var(--bad);border-color:var(--bad)}
+.step.skipped::before,.step.missed::before{background:var(--muted);border-color:var(--muted)}
+.step .what{font-weight:500}
+.step .note{grid-column:1/-1;color:var(--muted);font-size:12.5px}
+.thread{background:var(--sunk);border-radius:var(--r);padding:12px;display:grid;gap:8px;max-height:360px;overflow:auto}
+.msg{max-width:82%;padding:8px 11px;border-radius:14px;font-size:13.5px;overflow-wrap:anywhere}
+.msg.out{justify-self:end;background:var(--bubble-out);color:var(--bubble-out-ink);border-bottom-right-radius:4px}
+.msg.in{justify-self:start;background:var(--surface);border:1px solid var(--line);border-bottom-left-radius:4px}
+.msg small{display:block;opacity:.75;font-size:11px;margin-top:3px;font-family:var(--mono)}
+pre.json{margin:0;background:var(--sunk);border-radius:8px;padding:10px 12px;font-family:var(--mono);font-size:12px;overflow-x:auto;line-height:1.55}
+
+/* tables */
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600}
+td.n,th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+input[type=time],input[type=number],textarea{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:5px 7px}
+input[type=number]{width:80px}
+textarea{width:100%;min-height:120px;font-family:var(--mono);font-size:13px;resize:vertical}
+
+/* report */
+.tiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+@media (max-width:900px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.tiles .tile:last-child{grid-column:1/-1}}
+@media (max-width:700px){.bar{position:static}}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;min-width:0}
+.tile span{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:block}
+.tile strong{font-family:var(--mono);font-size:26px;font-weight:500;font-variant-numeric:tabular-nums}
+.tile em{font-style:normal;font-size:12px;color:var(--muted);display:block}
+.tile.lead-tile{border-color:var(--accent)}
+.bars{display:grid;gap:10px}
+.barrow{display:grid;grid-template-columns:minmax(0,190px) minmax(0,1fr) 36px;gap:10px;align-items:center;font-size:13px}
+@media (max-width:520px){.barrow{grid-template-columns:minmax(0,1fr) 36px}.barrow .track{grid-column:1/-1;grid-row:2}}
+.track{height:10px;background:var(--sunk);border-radius:99px;overflow:hidden}
+.fill{height:100%;border-radius:99px;background:var(--bad)}
+.fill.wait{background:var(--warn)} .fill.skip{background:var(--muted)}
+
+/* tests */
+.test{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:8px;padding:9px 0;border-top:1px solid var(--line);align-items:start}
+.test:first-child{border-top:0}
+.mark{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;background:var(--sunk);color:var(--muted);margin-top:1px}
+.mark.pass{background:var(--ok-bg);color:var(--ok)} .mark.fail{background:var(--bad-bg);color:var(--bad)}
+.test .err{color:var(--bad);font-family:var(--mono);font-size:12px;grid-column:2/-1}
+.note{font-size:12.5px;color:var(--muted);background:var(--sunk);border-radius:8px;padding:9px 12px}
+footer{color:var(--muted);font-size:12px;padding-block:8px 24px}
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:99px;font-size:13px;font-weight:500;z-index:20;max-width:calc(100vw - 32px)}
+</style>
+
+</head>
+<body>
+<header class="bar">
+  <div class="wrap">
+    <div class="brand">
+      <div class="lamp" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="var(--accent-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg></div>
+      <div><h1>Porchlight Dialer</h1><p>Seller follow-up desk · demo with fictional data</p></div>
+    </div>
+    <div class="clock" aria-live="polite"><span class="lbl">Sim time</span><span class="t" id="clock">7:40 AM</span><span class="z">PT</span></div>
+    <div class="controls">
+      <button class="btn primary" id="run" type="button">Start dialer</button>
+      <button class="btn" id="step" type="button" title="Advance 5 minutes">+5 min</button>
+      <select class="btn" id="speed" aria-label="Simulation speed"><option value="1100">Normal speed</option><option value="350">Fast</option></select>
+      <button class="btn" id="reply" type="button">Simulate seller reply</button>
+      <button class="btn" id="reset" type="button">Reset day</button>
+    </div>
+  </div>
+  <div class="wrap"><nav class="tabs" role="tablist" id="tabs"></nav></div>
+</header>
+
+<main class="wrap" id="main"></main>
+<footer class="wrap">Demo build. Every lead, phone number (555 range) and address is fictional, and nothing is really dialed or texted. Calling windows are sample settings, not legal advice.</footer>
+<div class="toast" id="toast" hidden></div>
+
+<script src="rules.js"></script>
+<script>
+/* ---------- helpers ---------- */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const first=n=>n.split(' ')[0];
+const street=a=>a.split(',')[0];
+function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+/* ---------- seed data ---------- */
+const PLAN={0:[['call',510],['call',780],['text',1050]],1:[['call',600],['text',630]],3:[['call',660],['call',930]],7:[['text',720]]};
+const SEED=[
+  ['Gloria Benton','TX','(512) 555-0143','4418 Cedar Bend Dr, Austin',0,'Maybe. Depends on the number. Call me after 9.',{}],
+  ['Raymond Ortiz','FL','(813) 555-0178','2207 W Palmetto St, Tampa',0,"Yes. I inherited it and I live out of state. Call me.",{}],
+  ['Denise Whitaker','GA','(478) 555-0121','930 Ingleside Ave, Macon',1,"I'm interested. Mornings are best.",{}],
+  ['Harold Kim','CA','(559) 555-0164','5115 N Valentine Ave, Fresno',0,'Ok you can call me.',{}],
+  ['Tasha Monroe','OH','(937) 555-0119','118 Huffman Ave, Dayton',0,"Sure, what's the offer?",{}],
+  ['Curtis Lane','AZ','(480) 555-0136','2650 E Main St, Mesa',3,'Still thinking. Try me later this week.',{}],
+  ['Bev Sorensen','CO','(719) 555-0152','1402 Elizabeth St, Pueblo',1,'Yes please call. Roof needs work so cash is good.',{}],
+  ['Luis Navarro','NV','(775) 555-0187','780 Ralston St, Reno',0,'Call me. Please no more texts.',{textOptOut:true}],
+  ['Arlene Fischer','TX','(254) 555-0110','3311 Lyle Ave, Waco',0,'Yes. I keep missing your calls, try again.',{attemptsToday:2}],
+  ['Jerome Pike','FL','(352) 555-0195','47 SE 8th St, Ocala',7,'Not ready yet. Maybe next month.',{}],
+  ['Marlene Duarte','CA','(661) 555-0129','2914 Pico Ave, Bakersfield',1,'Ok, interested.',{}],
+  ['Victor Hale','CO','(970) 555-0140','615 Elm Ave, Grand Junction',3,"Call me, I'm on shift until 3.",{}]
+];
+const POOL=[
+  ['Nadine Brooks','GA','(706) 555-0173','212 Pine St, Augusta','Yes I would sell. Call me now if you can.'],
+  ['Owen Tate','OH','(614) 555-0108','88 Oak Park Ave, Columbus',"Interested. What's the next step?"],
+  ['Rosa Ibarra','TX','(210) 555-0156','6029 Culebra Rd, San Antonio','Hi yes I got your text. Call me.'],
+  ['Wendell Price','CA','(916) 555-0131','3740 Fruitridge Rd, Sacramento','Sure, give me a call.']
+];
+const AGENTS=[['a1','Marcus Reed'],['a2','Priya Shah'],['a3','Leo Grant']];
+const OFFICE='(512) 555-0100';
+
+let S,cfg=defaultCfg(),timer=null,tab='dialer',selected=null,filter='all',testRun=null;
+
+function makeLead(i,[name,state,phone,address,day,reply,extra]){
+  const lead={id:'L'+(i+1),crm:'SL-'+(1040+i),name,state,phone,address,planDay:day,attemptsToday:0,textOptOut:false,busy:false,closed:false,status:'Ready to talk',outcome:null,crmLast:null,touches:[],thread:[],...extra};
+  lead.touches=(PLAN[day]||[]).map(([type,due],k)=>({id:lead.id+'-'+k,type,due,status:'pending',note:''}));
+  lead.thread=[{dir:'out',text:`Hi ${first(name)}, this is Sam with Porchlight Home Buyers. Would you consider a cash offer on ${street(address)}?`,t:day?`${day+1} days ago`:'Yesterday'}];
+  if(day>0)lead.thread.push({dir:'out',text:`Following up on ${street(address)}. Still open to an offer?`,t:`${day} day${day>1?'s':''} ago`});
+  lead.thread.push({dir:'in',text:reply,t:day?`${day} day${day>1?'s':''} ago`:'Yesterday'});
+  if(lead.attemptsToday)lead.touches.unshift({id:lead.id+'-p',type:'call',due:490,status:'done',note:'Earlier today: 2 attempts, no answer'});
+  return lead;
+}
+function reset(){
+  stop();
+  S={now:460,rand:rng(20261028),leads:SEED.map((s,i)=>makeLead(i,s)),pool:POOL.map(p=>[...p]),agents:AGENTS.map(([id,name])=>({id,name,status:'available',lead:null,touch:null,left:0,since:0})),log:[],crm:[],closedDay:false,auto:0};
+  addLog('enroll',`Day started. <b>${S.leads.length}</b> sellers are in follow-up plans.`);
+  render();
+}
+
+/* ---------- engine ---------- */
+const leadById=id=>S.leads.find(l=>l.id===id);
+function addLog(kind,html){S.log.unshift({t:S.now,kind,html});if(S.log.length>250)S.log.pop();}
+function crmWrite(lead,fields){
+  const payload={board:'Seller Leads',item_id:lead.crm,column_values:{status:lead.status,attempts_today:lead.attemptsToday,...fields,updated_pt:fmt(S.now)}};
+  lead.crmLast=payload;S.crm.unshift({t:S.now,lead:lead.id,payload});
+  addLog('crm',`Wrote <b>${esc(lead.name)}</b> to CRM: ${esc(fields.last_touch||lead.status)}`);
+}
+function sendText(lead,text,touch){
+  lead.thread.push({dir:'out',text,t:fmt(localMin(lead,S.now,cfg))+' local'});
+  if(touch){touch.status='done';touch.note=`Sent ${fmt(S.now)} PT`;}
+  addLog('text',`Texted <b>${esc(lead.name)}</b> in the same thread`);
+}
+function processTexts(){
+  for(const lead of S.leads){
+    if(lead.busy)continue;
+    const l=localMin(lead,S.now,cfg);
+    for(const t of lead.touches){
+      if(t.type!=='text'||t.status!=='pending'||t.due>l)continue;
+      if(lead.closed&&!t.auto){t.status='skipped';t.note='Plan stopped';continue;}
+      const c=canText(lead,S.now,cfg);
+      if(c.ok){sendText(lead,t.body||`Hi ${first(lead.name)}, Sam from Porchlight again. Still happy to make an offer on ${street(lead.address)} this week. Want me to call?`,t);crmWrite(lead,{last_touch:'Text sent'});}
+      else if(c.kind==='block'){t.status='blocked';t.note=c.reason;addLog('block',`Skipped text to <b>${esc(lead.name)}</b>: ${esc(c.reason)}`);}
+      else t.note='Waiting: '+c.reason;
+    }
+  }
+}
+function startDial(agent,lead,touch){
+  lead.attemptsToday++;lead.busy=true;lead.status='Dialing';
+  touch.status='done';touch.note=`Dialed ${fmt(S.now)} PT by ${first(agent.name)}`;
+  agent.status='dialing';agent.lead=lead.id;agent.touch=touch.id;agent.since=S.now;
+  addLog('dial',`Dialing <b>${esc(lead.name)}</b> (${lead.state}, ${fmt(localMin(lead,S.now,cfg))} local). <b>${esc(first(agent.name))}</b> is free and held for the call.`);
+}
+function resolveDial(agent){
+  const lead=leadById(agent.lead),touch=lead.touches.find(t=>t.id===agent.touch),r=S.rand();
+  if(r<0.42){
+    agent.status='oncall';agent.left=2+Math.floor(S.rand()*3);agent.since=S.now;lead.status='On a call';
+    touch.note+=' · answered, connected';
+    addLog('connect',`<b>${esc(lead.name)}</b> answered. Connected to <b>${esc(first(agent.name))}</b> instantly.`);
+    crmWrite(lead,{last_touch:'Call answered',agent:agent.name});
+  }else{
+    const result=r<0.78?'No answer':'Voicemail';
+    touch.note+=' · '+result.toLowerCase();
+    lead.busy=false;lead.status=result;agent.status='available';agent.lead=null;agent.touch=null;
+    addLog('dial',`${result} from <b>${esc(lead.name)}</b>. ${esc(first(agent.name))} is free again.`);
+    crmWrite(lead,{last_touch:'Call: '+result});
+    lead.touches.push({id:lead.id+'-a'+(++S.auto),type:'text',due:localMin(lead,S.now,cfg),status:'pending',auto:true,label:'Missed-call text',
+      body:`Hi ${first(lead.name)}, ${first(agent.name)} from Porchlight here. Just tried calling about ${street(lead.address)}. Is now a good time? You can reach me at ${OFFICE}.`});
+  }
+}
+function endCall(agent){
+  const lead=leadById(agent.lead),r=S.rand();
+  const outcome=r<0.42?'Appointment set':r<0.77?'Call back tomorrow':'Not interested';
+  lead.outcome=outcome;lead.status=outcome;lead.busy=false;
+  if(outcome!=='Call back tomorrow'){
+    lead.closed=true;
+    lead.touches.forEach(t=>{if(t.status==='pending'&&!t.auto){t.status='skipped';t.note='Plan stopped: '+outcome.toLowerCase();}});
+  }
+  if(outcome==='Appointment set')lead.touches.push({id:lead.id+'-a'+(++S.auto),type:'text',due:localMin(lead,S.now,cfg),status:'pending',auto:true,label:'Confirmation text',
+    body:`Thanks ${first(lead.name)}! Confirmed: ${first(agent.name)} will walk through ${street(lead.address)} tomorrow at 10:00 AM. Reply here if that changes.`});
+  addLog('connect',`Call with <b>${esc(lead.name)}</b> ended: ${outcome}. ${esc(first(agent.name))} is wrapping up.`);
+  crmWrite(lead,{last_touch:'Call ended',outcome,agent:agent.name});
+  agent.status='wrap';agent.lead=null;agent.touch=null;agent.since=S.now;
+}
+function tick(){
+  if(S.closedDay)return;
+  S.now+=5;
+  for(const a of S.agents){
+    if(a.status==='dialing')resolveDial(a);
+    else if(a.status==='oncall'){if(--a.left<=0)endCall(a);}
+    else if(a.status==='wrap')a.status='available';
+  }
+  processTexts();
+  const q=evaluateQueue(S.leads,S.now,cfg);
+  for(const it of q.blocked){it.touch.status='blocked';it.touch.note=it.check.reason;addLog('block',`Did not call <b>${esc(it.lead.name)}</b>: ${esc(it.check.reason)}`);crmWrite(it.lead,{last_touch:'Call blocked',reason:it.check.reason});}
+  for(const it of q.waiting)it.touch.note='Waiting: '+it.check.reason;
+  for(const p of planDial(S.leads,S.agents,S.now,cfg)){
+    const lead=leadById(p.leadId);startDial(S.agents.find(a=>a.id===p.agentId),lead,lead.touches.find(t=>t.id===p.touchId));
+  }
+  if(S.now>=1410){stop();toast('Sim day ended at 11:30 PM PT. Close the day on the Report tab.');}
+  render();
+}
+function simulateReply(){
+  if(!S.pool.length){toast('No more sample sellers to reply.');return;}
+  const [name,state,phone,address,reply]=S.pool.shift();
+  const lead=makeLead(S.leads.length,[name,state,phone,address,0,reply,{}]);
+  lead.thread=[{dir:'out',text:`Hi ${first(name)}, this is Sam with Porchlight Home Buyers. Would you consider a cash offer on ${street(address)}?`,t:'Yesterday'},{dir:'in',text:reply,t:'Just now'}];
+  const l=localMin(lead,S.now,cfg);
+  lead.touches=[{type:'call',due:l},{type:'call',due:l+180},{type:'text',due:l+300}].map((t,k)=>({...t,id:lead.id+'-'+k,status:'pending',note:''}));
+  lead.planDay='new';
+  S.leads.push(lead);
+  addLog('enroll',`<b>${esc(name)}</b> replied "${esc(reply)}". Enrolled in the hot seller plan.`);
+  crmWrite(lead,{last_touch:'Seller replied',plan:'Hot seller'});
+  toast(`${name} replied and was enrolled`);render();
+}
+function closeDay(){
+  stop();
+  S.leads.forEach(l=>l.touches.forEach(t=>{if(t.status==='pending'){t.status='missed';t.note=(t.note||'').startsWith('Waiting')?t.note.replace('Waiting: ','Missed: '):'Not reached before end of day';}}));
+  S.closedDay=true;addLog('enroll','Day closed. Open touches were marked missed.');render();
+}
+
+/* ---------- run controls ---------- */
+function start(){if(S.closedDay){toast('This day is closed. Reset to run again.');return;}timer=setInterval(tick,+$('#speed').value);render();}
+function stop(){clearInterval(timer);timer=null;}
+let toastT;function toast(m){const el=$('#toast');el.textContent=m;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,2600);}
+
+/* ---------- views ---------- */
+function leadPill(lead){
+  if(dncSet(cfg).has(digits(lead.phone)))return'<span class="pill bad">Do not call</span>';
+  if(lead.status==='Dialing')return'<span class="pill sig ring">Dialing</span>';
+  if(lead.status==='On a call')return'<span class="pill acc ring">On a call</span>';
+  if(lead.outcome==='Appointment set')return'<span class="pill ok">Appointment set</span>';
+  if(lead.outcome==='Not interested')return'<span class="pill">Not interested</span>';
+  if(lead.outcome==='Call back tomorrow')return'<span class="pill warn">Call back tomorrow</span>';
+  if(lead.touches.some(t=>t.status==='pending'))return'<span class="pill acc">In plan</span>';
+  return'<span class="pill">Done for today</span>';
+}
+function touchPill(t){
+  return({pending:'<span class="pill">Due</span>',done:'<span class="pill ok">Done</span>',blocked:'<span class="pill bad">Blocked</span>',skipped:'<span class="pill">Skipped</span>',missed:'<span class="pill warn">Missed</span>'})[t.status];
+}
+function queueRow(lead){
+  const l=localMin(lead,S.now,cfg),next=lead.touches.filter(t=>t.type==='call'&&t.status==='pending').sort((a,b)=>a.due-b.due)[0];
+  let pill;
+  if(lead.status==='Dialing')pill='<span class="pill sig ring">Dialing</span>';
+  else if(lead.status==='On a call')pill='<span class="pill acc ring">Connected</span>';
+  else{const c=canCall(lead,S.now,cfg);
+    if(c.kind==='block')pill=`<span class="pill bad">${esc(c.reason.split(' (')[0])}</span>`;
+    else if(next&&next.due>l)pill=`<span class="pill">Due ${fmt(next.due)} local</span>`;
+    else if(c.kind==='wait')pill=`<span class="pill warn">${c.opens?'Opens '+fmt(c.opens)+' local':'After hours'}</span>`;
+    else pill='<span class="pill ok">Ready</span>';}
+  return`<div class="row"><div><button class="linkish" data-open="${lead.id}">${esc(lead.name)}</button><div class="meta">${lead.state} · ${fmt(l)} local · ${lead.attemptsToday}/${cfg.dailyLimit} calls today</div></div><div class="side">${pill}</div></div>`;
+}
+function viewDialer(){
+  const active=S.leads.filter(l=>l.status==='Dialing'||l.status==='On a call');
+  const queued=S.leads.filter(l=>!l.closed&&l.status!=='Dialing'&&l.status!=='On a call'&&l.touches.some(t=>t.type==='call'&&t.status==='pending'))
+    .sort((a,b)=>{const da=Math.min(...a.touches.filter(t=>t.type==='call'&&t.status==='pending').map(t=>t.due-cfg.states[a.state].off*60));const db=Math.min(...b.touches.filter(t=>t.type==='call'&&t.status==='pending').map(t=>t.due-cfg.states[b.state].off*60));return da-db;});
+  const agentCard=a=>{
+    const lead=a.lead&&leadById(a.lead);
+    const pill={available:'<span class="pill ok">Free</span>',dialing:'<span class="pill sig ring">Dialing</span>',oncall:'<span class="pill acc ring">On a call</span>',wrap:'<span class="pill warn">Wrap-up</span>',away:'<span class="pill">Away</span>'}[a.status];
+    const on=lead?`${a.status==='oncall'?'Talking with':'Calling'} <b>${esc(lead.name)}</b> · ${S.now-a.since} min`:a.status==='away'?'Not taking calls':a.status==='wrap'?'Logging notes':'Waiting for the next seller';
+    return`<div class="agent ${a.status==='oncall'?'live':a.status==='dialing'?'dial':''}"><div class="agent-top"><div class="av">${a.name.split(' ').map(w=>w[0]).join('')}</div><div style="min-width:0"><div class="nm">${esc(a.name)}</div></div></div><div class="on">${on}</div><div class="agent-foot">${pill}<button class="btn small" data-away="${a.id}" ${a.status!=='available'&&a.status!=='away'?'disabled':''}>${a.status==='away'?'Set free':'Set away'}</button></div></div>`;
+  };
+  return`<section class="view">
+    <div class="panel"><div class="panel-h"><div><h2>Agents</h2><p class="sub">The dialer only rings a seller when an agent is free, so nobody hears dead air when they pick up.</p></div></div>
+      <div class="agents">${S.agents.map(agentCard).join('')}</div></div>
+    <div class="grid-2">
+      <div class="panel"><div class="panel-h"><div><h2>Call queue</h2><p class="sub">Sellers with a call in their plan today, earliest due first.</p></div></div>
+        <div class="rows">${active.concat(queued).map(queueRow).join('')||'<p class="empty">No calls left in today\'s plans.</p>'}</div></div>
+      <div class="panel"><div class="panel-h"><div><h2>Activity</h2><p class="sub">Every dial, text, rule check and CRM write, newest first.</p></div></div>
+        <div class="log">${S.log.map(e=>`<div class="ev ${e.kind}"><span class="tm">${fmt(e.t)}</span><span class="ic" aria-hidden="true"></span><span>${e.html}</span></div>`).join('')}</div></div>
+    </div></section>`;
+}
+function viewLeads(){
+  const list=S.leads.filter(l=>filter==='all'||(filter==='plan'&&l.touches.some(t=>t.status==='pending'))||(filter==='talked'&&l.outcome)||(filter==='blocked'&&l.touches.some(t=>t.status==='blocked')));
+  if(!selected||!leadById(selected))selected=S.leads[0].id;
+  const lead=leadById(selected),l=localMin(lead,S.now,cfg),cc=canCall(lead,S.now,cfg),ct=canText(lead,S.now,cfg);
+  const chk=(lbl,c)=>`<span class="pill ${c.ok?'ok':c.kind==='block'?'bad':'warn'}">${lbl}: ${c.ok?'allowed now':esc(c.reason.split(' (')[0].toLowerCase())}</span>`;
+  const touches=[...lead.touches].sort((a,b)=>a.due-b.due);
+  return`<section class="grid-lead">
+    <div class="panel"><div class="panel-h"><h2>Sellers</h2><div class="filters" role="group" aria-label="Filter sellers">
+      ${[['all','All'],['plan','In plan'],['talked','Talked to'],['blocked','Had a block']].map(([k,v])=>`<button class="chip" data-filter="${k}" aria-pressed="${filter===k}">${v}</button>`).join('')}</div></div>
+      <div>${list.map(x=>`<button class="lead" data-sel="${x.id}" aria-current="${x.id===selected}"><span class="nm">${esc(x.name)}</span><span class="r">${leadPill(x)}<span class="meta mono">${x.attemptsToday}/${cfg.dailyLimit}</span></span><span class="meta">${esc(x.address)}, ${x.state} · Plan day ${x.planDay==='new'?'0 (new)':x.planDay}</span></button>`).join('')||'<p class="empty">No sellers match this filter.</p>'}</div></div>
+    <div class="panel" aria-live="polite">
+      <div class="panel-h"><div><h2>${esc(lead.name)}</h2><p class="sub">${esc(lead.address)}, ${lead.state}</p></div>${leadPill(lead)}</div>
+      <div class="kv"><div><span>Phone</span><strong class="mono">${esc(lead.phone)}</strong></div><div><span>Local time</span><strong class="mono">${fmt(l)}</strong></div><div><span>Calls today</span><strong class="mono">${lead.attemptsToday} of ${cfg.dailyLimit}</strong></div><div><span>CRM item</span><strong class="mono">${lead.crm}</strong></div></div>
+      <div class="checks">${chk('Call',cc)}${chk('Text',ct)}</div>
+      <div class="section"><h3>Follow-up plan today</h3><div class="timeline">${touches.map(t=>`<div class="step ${t.status}"><span class="what">${t.type==='call'?'Call':'Text'}${t.auto?' · '+esc(t.label):''} <span class="mono" style="color:var(--muted);font-weight:400">${fmt(t.due)} local</span></span>${touchPill(t)}${t.note?`<span class="note">${esc(t.note)}</span>`:''}</div>`).join('')||'<p class="empty">Nothing planned today.</p>'}</div></div>
+      <div class="section"><h3>Text thread</h3><div class="thread">${lead.thread.map(m=>`<div class="msg ${m.dir}">${esc(m.text)}<small>${esc(m.t)}</small></div>`).join('')}</div></div>
+      <div class="section"><h3>Last CRM write</h3>${lead.crmLast?`<pre class="json">${esc(JSON.stringify(lead.crmLast,null,2))}</pre>`:'<p class="empty">Nothing written yet today.</p>'}</div>
+    </div></section>`;
+}
+function viewRules(){
+  return`<section class="view">
+    <div class="panel"><div class="panel-h"><div><h2>Calling hours by state</h2><p class="sub">Checked in the seller's local time. Texts follow the same window. Changes apply on the next dialer tick.</p></div><button class="btn small" id="rulesReset">Restore sample settings</button></div>
+      <div class="tbl-wrap"><table><thead><tr><th>State</th><th>Time zone</th><th class="n">Offset from PT</th><th>Start</th><th>End</th><th>Sellers</th></tr></thead><tbody>
+      ${Object.entries(cfg.states).map(([k,s])=>`<tr><td><b>${k}</b> ${s.name}</td><td>${s.zone}</td><td class="n">${s.off?'+'+s.off+'h':'0h'}</td><td><input type="time" id="st-${k}" data-st="${k}" data-f="start" value="${toHHMM(s.start)}" aria-label="${s.name} start"></td><td><input type="time" id="en-${k}" data-st="${k}" data-f="end" value="${toHHMM(s.end)}" aria-label="${s.name} end"></td><td class="n">${S.leads.filter(l=>l.state===k).length}</td></tr>`).join('')}
+      </tbody></table></div>
+      <p class="note" style="margin-top:12px">These windows are sample settings for the demo. Florida is set to end at 8:00 PM to show a stricter state. Real windows should come from your compliance team.</p></div>
+    <div class="grid-2">
+      <div class="panel"><h2>Daily call limit</h2><p class="sub">Most calls one seller can get in a day. The next attempt is blocked and logged.</p>
+        <p style="margin-top:12px;display:flex;align-items:center;gap:10px"><input type="number" id="limit" min="1" max="10" value="${cfg.dailyLimit}" aria-label="Daily call limit"> calls per seller per day</p></div>
+      <div class="panel"><h2>Do-not-call list</h2><p class="sub">One number per line, any format. Numbers are matched on their last 10 digits. Blocks both calls and texts.</p>
+        <textarea id="dnc" style="margin-top:10px" aria-label="Do-not-call numbers">${esc(cfg.dncText)}</textarea>
+        <p class="sub">${dncSet(cfg).size} numbers on the list</p></div>
+    </div></section>`;
+}
+function stats(){
+  const rows=S.leads.map(lead=>{const pl=lead.touches.filter(t=>!t.auto&&!t.id.endsWith('-p'));const c=s=>pl.filter(t=>t.status===s).length;
+    return{lead,planned:pl.length,done:c('done'),blocked:c('blocked'),skipped:c('skipped'),missed:c('missed'),open:c('pending'),auto:lead.touches.filter(t=>t.auto&&t.status==='done').length};});
+  const sum=k=>rows.reduce((a,r)=>a+r[k],0);
+  const reasons={};
+  S.leads.forEach(l=>l.touches.forEach(t=>{if(t.auto||t.id.endsWith('-p'))return;let key=null;
+    if(t.status==='blocked')key=t.note.split(' (')[0];else if(t.status==='missed')key=t.note.startsWith('Missed:')?'Missed: '+t.note.slice(8).split(' (')[0].replace(/ in [A-Z]{2}$/,''):t.note;else if(t.status==='skipped')key='Skipped: plan stopped after a call';
+    if(key)reasons[key]=(reasons[key]||0)+1;}));
+  return{rows,planned:sum('planned'),done:sum('done'),blocked:sum('blocked'),skipped:sum('skipped'),missed:sum('missed'),open:sum('open'),auto:sum('auto'),reasons,
+    connected:S.leads.filter(l=>l.outcome).length,appts:S.leads.filter(l=>l.outcome==='Appointment set').length};
+}
+function viewReport(){
+  const s=stats(),max=Math.max(1,...Object.values(s.reasons));
+  const pct=s.planned?Math.round(s.done/s.planned*100):0;
+  return`<section class="view">
+    <div class="panel-h" style="margin:0"><div><h2>Daily report: planned vs. done</h2><p class="sub">${S.closedDay?'Day closed. Final numbers.':'Live numbers. Close the day to mark anything still open as missed.'}</p></div>
+      <button class="btn primary" id="closeDay" ${S.closedDay?'disabled':''}>Close the day</button></div>
+    <div class="tiles">
+      <div class="tile"><span>Planned touches</span><strong>${s.planned}</strong><em>calls and texts in today's plans</em></div>
+      <div class="tile lead-tile"><span>Done</span><strong>${s.done}</strong><em>${pct}% of plan</em></div>
+      <div class="tile"><span>Blocked by rules</span><strong>${s.blocked}</strong><em>DNC, opt-out or call limit</em></div>
+      <div class="tile"><span>${S.closedDay?'Missed':'Still open'}</span><strong>${S.closedDay?s.missed:s.open}</strong><em>${S.closedDay?'not reached before close':'due later or waiting on hours'}</em></div>
+      <div class="tile"><span>Conversations</span><strong>${s.connected}</strong><em>${s.appts} appointment${s.appts===1?'':'s'} set · ${s.auto} auto texts</em></div>
+    </div>
+    <div class="grid-2">
+      <div class="panel"><h2>Why touches didn't happen</h2><p class="sub">Everything in the plan that was blocked, skipped or missed, grouped by reason.</p>
+        <div class="bars" style="margin-top:14px">${Object.entries(s.reasons).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="barrow"><span>${esc(k)}</span><div class="track"><div class="fill ${k.startsWith('Missed')||k.startsWith('Not reached')?'wait':k.startsWith('Skipped')?'skip':''}" style="width:${v/max*100}%"></div></div><span class="mono" style="text-align:right">${v}</span></div>`).join('')||'<p class="empty">Nothing yet. Start the dialer to fill this in.</p>'}</div></div>
+      <div class="panel"><h2>CRM writes</h2><p class="sub">${S.crm.length} updates sent to the Seller Leads board today.</p>
+        <div class="log" style="max-height:260px;margin-top:10px">${S.crm.slice(0,40).map(c=>`<div class="ev crm"><span class="tm">${fmt(c.t)}</span><span class="ic"></span><span><b>${esc(leadById(c.lead).name)}</b> · ${esc(c.payload.column_values.last_touch||'')}${c.payload.column_values.outcome?' · '+esc(c.payload.column_values.outcome):''}</span></div>`).join('')||'<p class="empty">No writes yet.</p>'}</div></div>
+    </div>
+    <div class="panel"><h2>By seller</h2>
+      <div class="tbl-wrap" style="margin-top:10px"><table><thead><tr><th>Seller</th><th>State</th><th class="n">Planned</th><th class="n">Done</th><th class="n">Blocked</th><th class="n">Skipped</th><th class="n">${S.closedDay?'Missed':'Open'}</th><th>Outcome</th></tr></thead><tbody>
+      ${s.rows.map(r=>`<tr><td><button class="linkish" data-open="${r.lead.id}">${esc(r.lead.name)}</button></td><td>${r.lead.state}</td><td class="n">${r.planned}</td><td class="n">${r.done}</td><td class="n">${r.blocked}</td><td class="n">${r.skipped}</td><td class="n">${S.closedDay?r.missed:r.open}</td><td>${leadPill(r.lead)}</td></tr>`).join('')}
+      </tbody></table></div></div>
+  </section>`;
+}
+
+/* ---------- tests (run against the pure rule functions with default settings) ---------- */
+function L(o){return{id:'T',name:'Test Seller',state:'TX',phone:'(512) 555-0199',attemptsToday:0,textOptOut:false,busy:false,closed:false,touches:[],...o};}
+function eq(a,b,m){if(a!==b)throw new Error(`${m||'expected'}: got ${JSON.stringify(a)}, wanted ${JSON.stringify(b)}`);}
+const TESTS=[
+  ['Allows a call at exactly 8:00 AM local (start is inclusive)',()=>{const c=defaultCfg();eq(canCall(L({}),360,c).ok,true);}],
+  ['Blocks a call at 7:59 AM local',()=>{const c=defaultCfg();const r=canCall(L({}),359,c);eq(r.ok,false);eq(r.kind,'wait');}],
+  ['Blocks a call at 9:00 PM local (end is exclusive)',()=>{const c=defaultCfg();eq(canCall(L({}),1140,c).ok,false);}],
+  ["Uses the seller's own time zone: 7:00 AM PT is 9:00 AM in Texas",()=>{const c=defaultCfg();eq(canCall(L({state:'TX'}),420,c).ok,true,'TX');eq(canCall(L({state:'CA'}),420,c).ok,false,'CA');}],
+  ['Arizona runs on the Pacific clock in October (no DST)',()=>{const c=defaultCfg();eq(canCall(L({state:'AZ'}),450,c).ok,false);}],
+  ['Florida sample window ends at 8:00 PM local',()=>{const c=defaultCfg();eq(canCall(L({state:'FL'}),1019,c).ok,true,'7:59 PM');eq(canCall(L({state:'FL'}),1020,c).ok,false,'8:00 PM');}],
+  ['Matches do-not-call numbers in any format',()=>{const c=defaultCfg();c.dncText='937.555.0119';eq(canCall(L({phone:'(937) 555-0119'}),600,c).reason,'On do-not-call list');}],
+  ['Do-not-call wins over every other rule',()=>{const c=defaultCfg();c.dncText='+1 512 555 0199';const r=canCall(L({attemptsToday:9}),100,c);eq(r.reason,'On do-not-call list');eq(r.kind,'block');}],
+  ['Blocks the call once the daily limit is reached',()=>{const c=defaultCfg();eq(canCall(L({attemptsToday:2}),600,c).ok,true,'2 of 3');eq(canCall(L({attemptsToday:3}),600,c).kind,'block','3 of 3');}],
+  ['Never texts a seller who opted out',()=>{const c=defaultCfg();eq(canText(L({textOptOut:true}),600,c).reason,'Opted out of texts');}],
+  ['Blocks calls after midnight Eastern (11:30 PM PT is 2:30 AM in Florida)',()=>{const c=defaultCfg();eq(canCall(L({state:'FL'}),1410,c).ok,false);}],
+  ['Queue is empty when no call is due yet',()=>{const c=defaultCfg();const lead=L({touches:[{id:'x',type:'call',due:900,status:'pending'}]});eq(evaluateQueue([lead],600,c).items.length,0);}],
+  ['Queue puts the earliest due seller first, across time zones',()=>{const c=defaultCfg();const a=L({id:'A',state:'CA',touches:[{id:'a',type:'call',due:540,status:'pending'}]});const b=L({id:'B',state:'FL',touches:[{id:'b',type:'call',due:600,status:'pending'}]});eq(evaluateQueue([a,b],600,c).ready[0].lead.id,'B');}],
+  ['Never dials more sellers than there are free agents',()=>{const c=defaultCfg();const leads=['A','B','C'].map(id=>L({id,touches:[{id:id+'1',type:'call',due:500,status:'pending'}]}));
+    eq(planDial(leads,[{id:'x',status:'available'},{id:'y',status:'oncall'}],600,c).length,1,'one free');eq(planDial(leads,[{id:'y',status:'oncall'}],600,c).length,0,'none free');}],
+  ['Skips sellers already on a call',()=>{const c=defaultCfg();eq(evaluateQueue([L({busy:true,touches:[{id:'z',type:'call',due:500,status:'pending'}]})],600,c).items.length,0);}]
+];
+function runTests(){const t0=performance.now();testRun=TESTS.map(([name,fn])=>{try{fn();return{name,pass:true};}catch(e){return{name,pass:false,err:e.message};}});testRun.ms=(performance.now()-t0).toFixed(1);render();}
+function viewTests(){
+  const passed=testRun?testRun.filter(t=>t.pass).length:0;
+  return`<section class="view"><div class="panel">
+    <div class="panel-h"><div><h2>Rule tests</h2><p class="sub">${TESTS.length} tests run against the same rule functions the dialer uses, with the sample settings. Anything that touches calls or texts gets a test first.</p></div><button class="btn primary" id="runTests">${testRun?'Run again':'Run tests'}</button></div>
+    ${testRun?`<p class="note"><b>${passed} of ${testRun.length} passed</b> in ${testRun.ms} ms</p>`:''}
+    <div style="margin-top:8px">${TESTS.map(([name],i)=>{const r=testRun&&testRun[i];return`<div class="test"><span class="mark ${r?(r.pass?'pass':'fail'):''}">${r?(r.pass?'✓':'✕'):'·'}</span><span>${esc(name)}</span><span class="pill ${r?(r.pass?'ok':'bad'):''}">${r?(r.pass?'Pass':'Fail'):'Not run'}</span>${r&&!r.pass?`<span class="err">${esc(r.err)}</span>`:''}</div>`;}).join('')}</div>
+  </div></section>`;
+}
+
+/* ---------- render + events ---------- */
+const TABS=[['dialer','Dialer'],['leads','Sellers'],['rules','Rules'],['report','Report'],['tests','Tests']];
+function render(){
+  $('#clock').textContent=fmt(S.now);
+  $('#run').textContent=timer?'Pause dialer':'Start dialer';
+  const open=S.leads.reduce((a,l)=>a+l.touches.filter(t=>t.status==='pending').length,0);
+  $('#tabs').innerHTML=TABS.map(([k,v])=>`<button class="tab" role="tab" aria-selected="${tab===k}" data-tab="${k}">${v}${k==='leads'?`<span class="cnt">${S.leads.length}</span>`:k==='report'?`<span class="cnt">${open} open</span>`:''}</button>`).join('');
+  const active=document.activeElement&&document.activeElement.id;
+  if(tab==='rules'&&active&&['limit','dnc'].concat(Object.keys(cfg.states).flatMap(k=>['st-'+k,'en-'+k])).includes(active))return; // don't redraw under the user's cursor
+  const scroll=[...document.querySelectorAll('.log,.thread')].map(e=>e.scrollTop);
+  $('#main').innerHTML={dialer:viewDialer,leads:viewLeads,rules:viewRules,report:viewReport,tests:viewTests}[tab]();
+  document.querySelectorAll('.log,.thread').forEach((e,i)=>{if(e.classList.contains('thread'))e.scrollTop=e.scrollHeight;else if(scroll[i])e.scrollTop=scroll[i];});
+}
+function go(t){tab=t;try{history.replaceState(null,'','#'+t);}catch(e){}render();window.scrollTo({top:0});}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  if(b.id==='run'){timer?stop():start();render();}
+  else if(b.id==='step'){if(!S.closedDay)tick();}
+  else if(b.id==='reset'){reset();toast('New day loaded');}
+  else if(b.id==='reply')simulateReply();
+  else if(b.id==='closeDay'){closeDay();toast('Day closed');}
+  else if(b.id==='runTests')runTests();
+  else if(b.id==='rulesReset'){cfg=defaultCfg();render();toast('Sample settings restored');}
+  else if(b.dataset.tab)go(b.dataset.tab);
+  else if(b.dataset.open){selected=b.dataset.open;go('leads');}
+  else if(b.dataset.sel){selected=b.dataset.sel;render();}
+  else if(b.dataset.filter){filter=b.dataset.filter;render();}
+  else if(b.dataset.away){const a=S.agents.find(x=>x.id===b.dataset.away);a.status=a.status==='away'?'available':'away';addLog('enroll',`${esc(a.name)} is ${a.status==='away'?'away':'free'}.`);render();}
+});
+document.addEventListener('change',e=>{
+  const el=e.target;
+  if(el.dataset.st){const v=fromHHMM(el.value);if(!el.value)return;cfg.states[el.dataset.st][el.dataset.f]=v;toast(`${cfg.states[el.dataset.st].name} hours updated`);}
+  else if(el.id==='limit'){const v=Math.max(1,Math.min(10,parseInt(el.value,10)||3));cfg.dailyLimit=v;el.value=v;toast(`Daily limit set to ${v}`);}
+  else if(el.id==='dnc'){cfg.dncText=el.value;el.blur();toast(`Do-not-call list saved (${dncSet(cfg).size} numbers)`);render();}
+  else if(el.id==='speed'&&timer){stop();start();}
+});
+document.addEventListener('focusout',e=>{if(tab==='rules'&&e.target.matches('input,textarea'))setTimeout(()=>{if(!document.activeElement||!document.activeElement.matches('input,textarea'))render();},0);});
+const h=(location.hash||'').slice(1);if(TABS.some(([k])=>k===h))tab=h;
+window.addEventListener('hashchange',()=>{const k=location.hash.slice(1);if(TABS.some(([t])=>t===k)&&k!==tab){tab=k;render();}});
+reset();
+</script>
+
+</body>
+</html>
